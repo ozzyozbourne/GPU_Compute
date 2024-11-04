@@ -1,0 +1,2 @@
+
+1) The kernel is the simt and number of invocation of this kernel code can be called a simt group ?

@@ -1,9 +1,20 @@
-#define CHECK_CUDA_ERROR(call) { \       // Macro definition starts
-    cudaError_t err = call; \           // Execute CUDA call and store result
-    if (err != cudaSuccess) { \         // Check if error occurred
-        printf("CUDA Error: %s at line %d\n", \
-               cudaGetErrorString(err), \  // Convert error code to string
-               __LINE__); \                // Built-in macro for current line number
-        exit(1); \                        // Exit program if error
-    } \
-}
+in cuda we have injectable value that are of dim3 they are threadIdx.x, y, z, blockIdx.x, y, z and blockDim
+
+
+threadIdx = the thread id in a block they are from 0 to blockDim - 1
+blockDim = This is the size of the block 
+blockIdx = this is number of blocks that are launched they are number from 0 to number of launched -1
+
+so when setting by the number of block there will be some thread are go to waste since each thread does the 
+same work in paralle so, the size of the block will always to be multiple of 32 since the warp size is 32 so 
+256 is the good default size of the block so the number of threads block will be in the multiple of the 256
+so the number of threads that are needed might not always be or fit in the multiple of 256 so we have to 
+arrange this number of the blocks in such a way that, the numeber of threads lauched is always greater or 
+equal to the amount of work needed to be done in parallel, so the standard formula is 
+
+since the block size is a int so if we have a fractional part that will trunacated due to this 
+so number of threads need + max padding that wont push to the next value ie if the it is a 
+multiple of the block size the padding part will be trunacated, but if we say the a multiple of 
+block size + some value that is less than the block size then that will be trunacated so to avoid this 
+we add padding that is max value -1 so if we get a spill over then that will push to the next value of the 
+block and we get the extra threads but not less threads 
