@@ -15,7 +15,6 @@
 //Since we are using flatten 2d arrays
 #define IDX2D(i, j) (i * (N+2) + j)  
 #define TOLERANCE 0.003f
-#define BLOCK_SIZE 16
 
 void initMatrix(float *a){
     for(int i = 0; i <= N+1; i++){
@@ -52,7 +51,6 @@ int main(void){
 
     //Copy from gpu to cpu
     CHECK_CUDA_ERROR(cudaMemcpy(cpu_arr_a, gpu_arr_a, arr_size, cudaMemcpyDeviceToHost));
-
 
     printMatrix(cpu_arr_a);
 
