@@ -34,7 +34,32 @@ void printMatrix(const float *A) {
 }
 
 int main(void){
-    float *cpu_arr_a, *cpu_arr_b;
+    float *cpu_arr_a ;
     float *gpu_arr_a, *gpu_arr_b;
 
+    const size_t arr_size = (N*2) * (N+2) *sizeof(float);
+
+    //Allocate in cpu
+    cpu_arr_a = (float*)malloc(arr_size);
+    initMatrix(cpu_arr_a);
+    
+    //Allocate in gpu
+    CHECK_CUDA_ERROR(cudaMalloc(gpu_arr_a, arr_size));
+    CHECK_CUDA_ERROR(cudaMalloc(gpu_arr_b, arr_size));
+
+    //Copy to gpu
+    CHECK_CUDA_ERROR(cudaMemcpy(gpu_arr_a, cpu_arr_a, arr_size, cudaMemcpyHostToDevice));
+
+    //Copy from gpu to cpu
+    CHECK_CUDA_ERROR(cudaMemcpy(cpu_arr_a, gpu_arr_a, arr_size, cudaMemcpyDeviceToHost));
+
+
+    printMatrix(cpu_arr_a);
+
+    //CleanUp
+    free(cpu_arr_a);
+    CHECK_CUDA_ERROR(cudaFree(gpu_arr_a));
+    CHECK_CUDA_ERROR(cudaFree(gpu_arr_b));
+
+    return 0;
 }
