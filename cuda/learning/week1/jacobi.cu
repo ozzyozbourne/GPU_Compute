@@ -17,7 +17,7 @@
 #define TOLERANCE 0.003f
 
 //Globals only on the GPU ``
-__device__ bool is_done;
+__device__ int is_done;
 
 __device__ int arrivalLock;
 __device__ int departureLock;
@@ -42,19 +42,19 @@ __device__ bool aggregate(const bool mydone){
 
     //Arrival phase
     Lock(&arrivalLock);
-    count += 1;
-    is_done &= mydone;
+    atomicAdd(&count, 1);
+    atomicAnd(&is_done, mydone ? 1 : 0);
     if (count < N) { Unlock(&arrivalLock); }
     else { Unlock(&departureLock); }
 
     //departure phase
     Lock(&departureLock);
-    count -= 1;
-    result = is_done;
-    if (count > 0) { Unlock(departureLock); }
+    atomicSub(&count, 1);
+    result = (is_done != 0);
+    if (count > 0) { Unlock(&departureLock); }
     else { 
-        Unlock(arrivalLock);
-        is_done = true;
+        Unlock(&arrivalLock);
+        is_done = 1;
     }
     return result;
 
@@ -81,7 +81,7 @@ __global__ void jacobi_relaxation(){
             }
             __syncthreads();
             for(int j = 1; j <= N; j++){ gpu_arr_a[IDX2D(idx, j)] = gpu_arr_b[IDX2D(idx, j)]; }
-            done = aggregate(max_change < change);
+            done = aggregate(max_change < TOLERANCE);
         }while(!done);
     }
 }
@@ -111,9 +111,8 @@ void printMatrix(const float *A) {
 int main(void){
     float *cpu_arr_a, *gpu_arr_temp_a, *gpu_arr_temp_b;
     int zero = 0, one = 1;
-    bool f = false;
     
-    const size_t arr_size = (N*2) * (N+2) *sizeof(float);
+    const size_t arr_size = (N+2) * (N+2) *sizeof(float);
 
     //Allocate in cpu
     cpu_arr_a = (float*)malloc(arr_size);
@@ -127,7 +126,7 @@ int main(void){
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(count,         &zero, sizeof(int)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(arrivalLock,   &zero, sizeof(int)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(departureLock, &one,  sizeof(int)));
-    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(is_done,       &f,    sizeof(bool)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(is_done,       &one,  sizeof(bool)));
 
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_a, &gpu_arr_temp_a, sizeof(float *)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_b, &gpu_arr_temp_b, sizeof(float *)));
@@ -136,16 +135,21 @@ int main(void){
     //Copy to gpu
     CHECK_CUDA_ERROR(cudaMemcpy(gpu_arr_temp_a, cpu_arr_a, arr_size, cudaMemcpyHostToDevice));
 
-    //Copy from gpu to cpu
-    CHECK_CUDA_ERROR(cudaMemcpy(cpu_arr_a, gpu_arr_temp_a, arr_size, cudaMemcpyDeviceToHost));
-
-    printMatrix(cpu_arr_a);
+    //Setup the blocks and call the kernel
+    const int blocksize = N + 2;
+    const int numOfBlocks = 1;
+    jacobi_relaxation<<<numOfBlocks, blocksize>>>();
 
     // Check for kernel launch errors 
     CHECK_CUDA_ERROR(cudaGetLastError());
 
     //Wait for the kernel to finish and check for errors
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+
+    //Copy from gpu to cpu
+    CHECK_CUDA_ERROR(cudaMemcpy(cpu_arr_a, gpu_arr_temp_a, arr_size, cudaMemcpyDeviceToHost));
+
+    printMatrix(cpu_arr_a);
 
     //CleanUp
     free(cpu_arr_a);
@@ -154,7 +158,7 @@ int main(void){
 
     //Reset the Gpu
     CHECK_CUDA_ERROR(cudaDeviceReset());
-    return success ? 0 : -1;
+    return 0;
 }
 
 /********* CPU FUNCTIONS END HERE********************/
