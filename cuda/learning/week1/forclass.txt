@@ -1,2 +1,27 @@
 
 1) The kernel is the simt and number of invocation of this kernel code can be called a simt group ?
+
+
+2) In cpu the since the number of core are scare resource so then the thread is not doing any work 
+then it is considered the best stratery to make the thread sleep or park it ie unload it from the 
+Cpu, meaning the os scheduler has preemptive nature ie it controls when the thread should and should 
+not run, but in GPU the we have a lot more processors to handle the threads so, in the paradigm, the 
+best stratery when a threads needs to stop doing work is to make it do useless work like spinning for 
+a lock so the thread is executing in the gpu core this is ok since the gpu has to preemptive scheduling 
+mechanisms to wake and park the threads.
+
+3) Channels/Streams - the main nature of this type do synchonization mechanism is the ablity to unload 
+the thread off the cpu when the channels is empty, and to wake up the thread when there is some data in 
+channels ie it needs a preemptive nature, so this is not for gpu architectures since they dont have a 
+preemptive scheduler, these are best for green threads/ fibers implementations 
+
+4) The gpu has block level scheduling but it does have a way it to stop a block for a higher priority 
+block, ie no preemptive scheduling, and the block which is spinning cannot yeild control to some 
+other block to run ie no co operative scheduling, hence there is no mechanism for a contex switch meaning 
+that once the resources are allocated for a block, until the block completes it work no other block can 
+run on that gpu core.
+
+5)Sychronization pattern in gpus is based on spinning rather than yeilding 
+
+6)Since the gpu threads cannot to suspeneded or put to sleep, so can the binary tree barier can be 
+implemented efficiently in the gpus?
