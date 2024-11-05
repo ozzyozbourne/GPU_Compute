@@ -3,9 +3,9 @@
 #include <cuda_runtime.h>
 
 // Error macro
-#define CHECK_CUDA_ERROR(call) { \ 
+#define CHECK_CUDA_ERROR(call) { \
     const cudaError_t err = call; \
-    if (err != cudaSuccess) { \ 
+    if (err != cudaSuccess) { \
         printf("CUDA Error: %s at line %d\n", cudaGetErrorString(err), __LINE__); \
         exit(1); \
     } \
@@ -61,7 +61,7 @@ int main(void){
     const int block_size = 256;
     const int num_of_blocks = (vec_size + block_size - 1) / block_size;
     //Launch the gpu kernel
-    vectorAdd<<num_of_blocks, block_size>>(gpu_vec_a, gpu_vec_b, gpu_vec_res);
+    vectorAdd<<<num_of_blocks, block_size>>>(gpu_vec_a, gpu_vec_b, gpu_vec_res, vec_size);
 
     // Check for kernel launch errors 
     CHECK_CUDA_ERROR(cudaGetLastError());
