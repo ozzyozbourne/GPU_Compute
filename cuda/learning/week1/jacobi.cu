@@ -18,30 +18,35 @@
 
 //Globals only on the GPU ``
 __device__ bool isDone;
+__device__ bool arrivalLock;
+__device__ bool departureLock;
+
 __device__ float *gpu_arr_a;
 __device__ float *gpu_arr_b;
 
-__global__ void jacobi_relaxation(const int n){
+__global__ void jacobi_relaxation(){
     // this is foralls i 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; 
-    float change = 0.0f, max_change;
-    bool done = false;
-    do {
-        max_change = 0.0f;
-        for(int j = 1; j <=n; j++){
-            gpu_arr_b[IDX2D(idx, j)] =  (
-                    gpu_arr_a[IDX2D(idx-1, j)] 
-                  + gpu_arr_a[IDX2D(idx+1, j)] 
-                  + gpu_arr_a[IDX2D(idx, j-1)] 
-                  + gpu_arr_a[IDX2D(idx, j+1)]
-                  ) / 4 ;
-            change = fabs(gpu_arr_b[IDX2D(idx, j)] - gpu_arr_a[IDX2D(idx, j)]);
-            if (change > max_change){ max_change = change; }
-        }
-        __syncthreads();
-        for(int j = 1; j <= n; j++){ gpu_arr_a[IDX2D(idx, j)] = gpu_arr_b[IDX2D(idx, j)]; }
-        done = aggregate(max_change < change);
-    }while(!done);
+    if (idx > 0 && idx < N + 1){
+        float change = 0.0f, max_change = 0.0f;
+        bool done = false;
+        do {
+            max_change = 0.0f;
+            for(int j = 1; j <= N; j++){
+                gpu_arr_b[IDX2D(idx, j)] =  (
+                      gpu_arr_a[IDX2D(idx-1, j)] 
+                    + gpu_arr_a[IDX2D(idx+1, j)] 
+                    + gpu_arr_a[IDX2D(idx, j-1)] 
+                    + gpu_arr_a[IDX2D(idx, j+1)]
+                    ) / 4.0f ;
+                change = fabsf(gpu_arr_b[IDX2D(idx, j)] - gpu_arr_a[IDX2D(idx, j)]);
+                if (change > max_change){ max_change = change; }
+            }
+            __syncthreads();
+            for(int j = 1; j <= N; j++){ gpu_arr_a[IDX2D(idx, j)] = gpu_arr_b[IDX2D(idx, j)]; }
+            done = aggregate(max_change < change);
+        }while(!done);
+    }
 }
 
 void initMatrix(float *a){
@@ -62,7 +67,7 @@ void printMatrix(const float *A) {
 
 int main(void){
     float *cpu_arr_a, *gpu_arr_temp_a, *gpu_arr_temp_b;
-    bool value = false;
+    bool value = false, value2 = true;
     
     const size_t arr_size = (N*2) * (N+2) *sizeof(float);
 
@@ -76,6 +81,9 @@ int main(void){
 
     //Copy pointers to global variables 
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(isDone, &value, sizeof(bool)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(arrivalLock, &value2, sizeof(bool)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(departureLock, &value, sizeof(bool)));
+
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_a, &gpu_arr_temp_a, sizeof(float *)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_b, &gpu_arr_temp_b, sizeof(float *)));
 
