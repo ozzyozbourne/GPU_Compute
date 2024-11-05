@@ -17,10 +17,10 @@
 #define TOLERANCE 0.003f
 
 //Globals only on the GPU ``
-__device__ bool isDone;
-__device__ bool arrivalLock;
-__device__ bool departureLock;
+__device__ bool is_done;
 
+__device__ int arrivalLock;
+__device__ int departureLock;
 __device__ int count;
 
 __device__ float *gpu_arr_a;
@@ -31,16 +31,33 @@ __device__ float *gpu_arr_b;
 /********* GPU FUNCTIONS BEGIN HERE *****************/
 
 //Cstar Lock implementation in CUDA
-__device__ void Lock(unsigned int *mutex){
-    while (atomicCAS(mutex, 0, 1) != 0){  /*spinning*/ }
-}
+__device__ void Lock(int *mutex){ while (atomicCAS(mutex, 0, 1) != 0){  /*spinning*/ } }
 
 //Cstar Unlock implementation in CUDA
-__device__ void Unlock(unsigned int *mutex){
-    atomicExch(mutex, 0);
-}
-__device__ bool aggregate(bool mydone, int n){
+__device__ void Unlock(int *mutex){ atomicExch(mutex, 0); }
+
+
+__device__ bool aggregate(const bool mydone){
     bool result;
+
+    //Arrival phase
+    Lock(&arrivalLock);
+    count += 1;
+    is_done &= mydone;
+    if (count < N) { Unlock(&arrivalLock); }
+    else { Unlock(&departureLock); }
+
+    //departure phase
+    Lock(&departureLock);
+    count -= 1;
+    result = is_done;
+    if (count > 0) { Unlock(departureLock); }
+    else { 
+        Unlock(arrivalLock);
+        is_done = true;
+    }
+    return result;
+
 }
 
 //Cuda kernel ie same as forall in cstar
@@ -69,7 +86,7 @@ __global__ void jacobi_relaxation(){
     }
 }
 
-/********* GPU FUNCTIONS END HERE********************/
+/********* GPU FUNCTIONS END HERE *******************/
 
 
 /********* CPU FUNCTIONS BEGIN HERE *****************/
@@ -93,8 +110,8 @@ void printMatrix(const float *A) {
 //Set-up GPU -> Launch kernel -> Verify results -> Tear-down GPU
 int main(void){
     float *cpu_arr_a, *gpu_arr_temp_a, *gpu_arr_temp_b;
-    bool value = false, value2 = true;
-    int zero = 0;
+    int zero = 0, one = 1;
+    bool f = false;
     
     const size_t arr_size = (N*2) * (N+2) *sizeof(float);
 
@@ -107,11 +124,10 @@ int main(void){
     CHECK_CUDA_ERROR(cudaMalloc(&gpu_arr_temp_b, arr_size));
 
     //Copy pointers to global variables 
-    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(count, &zero, sizeof(int)));
-
-    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(isDone, &value, sizeof(bool)));
-    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(arrivalLock, &value2, sizeof(bool)));
-    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(departureLock, &value, sizeof(bool)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(count,         &zero, sizeof(int)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(arrivalLock,   &zero, sizeof(int)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(departureLock, &one,  sizeof(int)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(is_done,       &f,    sizeof(bool)));
 
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_a, &gpu_arr_temp_a, sizeof(float *)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_b, &gpu_arr_temp_b, sizeof(float *)));
