@@ -53,8 +53,8 @@ __device__ bool aggregate(const bool mydone){
     result = (is_done != 0);
     if (count > 0) { Unlock(&departureLock); }
     else { 
+        atomicExch(&is_done, 1); 
         Unlock(&arrivalLock);
-        is_done = 1;
     }
     return result;
 
@@ -126,7 +126,7 @@ int main(void){
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(count,         &zero, sizeof(int)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(arrivalLock,   &zero, sizeof(int)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(departureLock, &one,  sizeof(int)));
-    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(is_done,       &one,  sizeof(bool)));
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(is_done,       &one,  sizeof(int)));
 
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_a, &gpu_arr_temp_a, sizeof(float *)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(gpu_arr_b, &gpu_arr_temp_b, sizeof(float *)));
