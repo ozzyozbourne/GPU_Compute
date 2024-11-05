@@ -21,6 +21,8 @@ __device__ bool isDone;
 __device__ bool arrivalLock;
 __device__ bool departureLock;
 
+__device__ int count;
+
 __device__ float *gpu_arr_a;
 __device__ float *gpu_arr_b;
 
@@ -49,6 +51,11 @@ __global__ void jacobi_relaxation(){
     }
 }
 
+__device__ bool aggregate(bool mydone, int n){
+    bool result;
+
+}
+
 void initMatrix(float *a){
     for(int i = 0; i <= N+1; i++){
         for(int j = 0; j <= N+1; j++){
@@ -68,6 +75,7 @@ void printMatrix(const float *A) {
 int main(void){
     float *cpu_arr_a, *gpu_arr_temp_a, *gpu_arr_temp_b;
     bool value = false, value2 = true;
+    int zero = 0;
     
     const size_t arr_size = (N*2) * (N+2) *sizeof(float);
 
@@ -80,6 +88,8 @@ int main(void){
     CHECK_CUDA_ERROR(cudaMalloc(&gpu_arr_temp_b, arr_size));
 
     //Copy pointers to global variables 
+    CHECK_CUDA_ERROR(cudaMemcpyToSymbol(count, &zero, sizeof(int)));
+
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(isDone, &value, sizeof(bool)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(arrivalLock, &value2, sizeof(bool)));
     CHECK_CUDA_ERROR(cudaMemcpyToSymbol(departureLock, &value, sizeof(bool)));
@@ -96,10 +106,18 @@ int main(void){
 
     printMatrix(cpu_arr_a);
 
+    // Check for kernel launch errors 
+    CHECK_CUDA_ERROR(cudaGetLastError());
+
+    //Wait for the kernel to finish and check for errors
+    CHECK_CUDA_ERROR(cudaDeviceSynchronize());
+
     //CleanUp
     free(cpu_arr_a);
     CHECK_CUDA_ERROR(cudaFree(gpu_arr_temp_a));
     CHECK_CUDA_ERROR(cudaFree(gpu_arr_temp_b));
 
-    return 0;
+    //Reset the Gpu
+    CHECK_CUDA_ERROR(cudaDeviceReset());
+    return success ? 0 : -1;
 }
