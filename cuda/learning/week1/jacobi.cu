@@ -26,6 +26,24 @@ __device__ int count;
 __device__ float *gpu_arr_a;
 __device__ float *gpu_arr_b;
 
+
+
+/********* GPU FUNCTIONS BEGIN HERE *****************/
+
+//Cstar Lock implementation in CUDA
+__device__ void Lock(unsigned int *mutex){
+    while (atomicCAS(mutex, 0, 1) != 0){  /*spinning*/ }
+}
+
+//Cstar Unlock implementation in CUDA
+__device__ void Unlock(unsigned int *mutex){
+    atomicExch(mutex, 0);
+}
+__device__ bool aggregate(bool mydone, int n){
+    bool result;
+}
+
+//Cuda kernel ie same as forall in cstar
 __global__ void jacobi_relaxation(){
     // this is foralls i 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x; 
@@ -51,10 +69,10 @@ __global__ void jacobi_relaxation(){
     }
 }
 
-__device__ bool aggregate(bool mydone, int n){
-    bool result;
+/********* GPU FUNCTIONS END HERE********************/
 
-}
+
+/********* CPU FUNCTIONS BEGIN HERE *****************/
 
 void initMatrix(float *a){
     for(int i = 0; i <= N+1; i++){
@@ -72,6 +90,7 @@ void printMatrix(const float *A) {
     }
 }
 
+//Set-up GPU -> Launch kernel -> Verify results -> Tear-down GPU
 int main(void){
     float *cpu_arr_a, *gpu_arr_temp_a, *gpu_arr_temp_b;
     bool value = false, value2 = true;
@@ -121,3 +140,6 @@ int main(void){
     CHECK_CUDA_ERROR(cudaDeviceReset());
     return success ? 0 : -1;
 }
+
+/********* CPU FUNCTIONS END HERE********************/
+
