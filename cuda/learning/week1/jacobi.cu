@@ -16,10 +16,33 @@
 #define IDX2D(i, j) (i * (N+2) + j)  
 #define TOLERANCE 0.003f
 
-//Globals
+//Globals only on the GPU ``
 __device__ bool isDone;
 __device__ float *gpu_arr_a;
 __device__ float *gpu_arr_b;
+
+__global__ void jacobi_relaxation(const int n){
+    // this is foralls i 
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x; 
+    float change = 0.0f, max_change;
+    bool done = false;
+    do {
+        max_change = 0.0f;
+        for(int j = 1; j <=n; j++){
+            gpu_arr_b[IDX2D(idx, j)] =  (
+                    gpu_arr_a[IDX2D(idx-1, j)] 
+                  + gpu_arr_a[IDX2D(idx+1, j)] 
+                  + gpu_arr_a[IDX2D(idx, j-1)] 
+                  + gpu_arr_a[IDX2D(idx, j+1)]
+                  ) / 4 ;
+            change = fabs(gpu_arr_b[IDX2D(idx, j)] - gpu_arr_a[IDX2D(idx, j)]);
+            if (change > max_change){ max_change = change; }
+        }
+        __syncthreads();
+        for(int j = 1; j <= n; j++){ gpu_arr_a[IDX2D(idx, j)] = gpu_arr_b[IDX2D(idx, j)]; }
+        done = aggregate(max_change < change);
+    }while(!done);
+}
 
 void initMatrix(float *a){
     for(int i = 0; i <= N+1; i++){
